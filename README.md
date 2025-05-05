@@ -58,11 +58,13 @@ The setup scripts perform the following operations:
 1. **System preparation**:
    * Update system packages
    * Install dependencies (Docker, supervisord, curl, jq, etc.)
+   * Setup Postgres Containers and setup the user for Vault DB Secrets engine
 2. **HashiCorp Vault installation**:
    * Download and install Vault
    * Configure Vault server
    * Set up supervisord to manage Vault process
    * Initialize and unseal Vault
+   * Setup the Vault Transit, Transform and DB Secrets engine
 3. **Vault Agent configuration**:
    * Install Vault Agent
    * Configure it as a cache and API proxy
@@ -70,9 +72,6 @@ The setup scripts perform the following operations:
 4. **HashiCups deployment**:
    * Pull and start HashiCups Docker containers
    * Configure HashiCups to communicate with Vault via Vault Agent
-5. **License configuration**:
-   * Copy the license file to required locations
-   * Apply the license to Vault
 
 ## Accessing the Application
 
