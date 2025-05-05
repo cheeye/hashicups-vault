@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment - Hashicups</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <img src="{{ url_for('static', filename='images/hashicorp.png') }}" alt="Hashicorp Logo" class="header-logo">
+            <h1>Complete Your Purchase</h1>
+            {% if product %}
+            <p class="selected-product">Selected Product: {{ product }}</p>
+            {% endif %}
+        </header>
+
+        {% if not submitted %}
+        <div class="payment-container">
+            <form action="{{ url_for('submit') }}" method="POST" class="payment-form" id="paymentForm">
+                <div class="form-group">
+                    <label for="card-number">Card Number</label>
+                    <input type="text" id="card-number" name="number" 
+                           placeholder="1234 5678 9012 3456" 
+                           pattern="[0-9\s]{19}" 
+                           maxlength="19"
+                           required>
+                    <span class="error-message" id="cardError"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="card-name">Cardholder Name</label>
+                    <input type="text" id="card-name" name="name" 
+                           placeholder="John Doe" 
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="expiry">Expiry Date</label>
+                    <input type="text" id="expiry" name="expiry" 
+                           placeholder="MM/YY" 
+                           pattern="(0[1-9]|1[0-2])\/([0-9]{2})"
+                           maxlength="5"
+                           required>
+                    <span class="error-message" id="expiryError"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="cvv">CVV</label>
+                    <input type="text" id="cvv" name="cvv" 
+                           placeholder="123" 
+                           pattern="[0-9]{3,4}"
+                           maxlength="4"
+                           required>
+                    <span class="error-message" id="cvvError"></span>
+                </div>
+                
+                <button type="submit" class="submit-button">Pay Now</button>
+            </form>
+
+            <div class="navigation-links">
+                <a href="{{ url_for('index') }}" class="return-home-button">Return to Home</a>
+            </div>
+        </div>
+        {% else %}
+        <div class="payment-container">
+            <div class="success-message">
+                <h2>Payment Processed!</h2>
+                <p>Thank you for your purchase, {{ name }}.</p>
+                {% if success %}
+                <p>Your transaction has been saved securely.</p>
+                {% else %}
+                <p>Note: There was an issue saving your transaction. Please contact support.</p>
+                {% endif %}
+            </div>
+
+            <div class="status-container">
+                <h3>Vault Security Demo</h3>
+                <div class="status-line">
+                    <span class="status-label">Original Card:</span>
+                    <span class="status-value">**** **** **** {{ last_four }}</span>
+                </div>
+                <div class="status-line">
+                    <span class="status-label">Transit Encryption:</span>
+                    <span class="status-value">{{ encrypted }}</span>
+                    <span class="hint">(AES-256-GCM96)</span>
+                </div>
+                <div class="status-line">
+                    <span class="status-label">Format Preserving Encryption:</span>
+                    <span class="status-value">{{ tokenized }}</span>
+                    <span class="hint">(Maintains card format)</span>
+                </div>
+                <div class="status-line">
+                    <span class="status-label">Masked Value:</span>
+                    <span class="status-value">{{ masked }}</span>
+                    <span class="hint">(For customer support)</span>
+                </div>
+            </div>
+
+            <div class="security-info">
+                <h3>HashiCorp Vault Security</h3>
+                <p>Your card information has been protected using multiple HashiCorp Vault techniques:</p>
+                <ul>
+                    <li><strong>Transit Encryption:</strong> Secure AES-256 encryption for storage</li>
+                    <li><strong>Format Preserving Encryption:</strong> Creates a secure token that looks like a card</li>
+                    <li><strong>Data Masking:</strong> Hides sensitive parts while preserving format</li>
+                </ul>
+                <p>All card processing is done server-side with Vault, and only the last 4 digits are stored in plaintext.</p>
+            </div>
+
+            <div class="navigation-links">
+                <a href="{{ url_for('index') }}" class="return-home-button">Return to Home</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Card number formatting
+        const cardNumberInput = document.getElementById('card-number');
+        if (cardNumberInput) {
+            cardNumberInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+                value = value.slice(0, 16); // Limit to 16 digits
+                let formatted = value.match(/.{1,4}/g)?.join(' ') || ''; // Add space every 4 digits
+                e.target.value = formatted;
+                
+                // Validation
+                const cardError = document.getElementById('cardError');
+                if (value.length < 16) {
+                    cardError.textContent = 'Please enter 16 digits';
+                } else {
+                    cardError.textContent = '';
+                }
+            });
+        }
+
+        // Expiry date formatting
+        const expiryInput = document.getElementById('expiry');
+        if (expiryInput) {
+            expiryInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+                if (value.length >= 2) {
+                    value = value.slice(0, 2) + '/' + value.slice(2, 4);
+                }
+                e.target.value = value;
+                
+                // Validation
+                const expiryError = document.getElementById('expiryError');
+                if (value.length < 5) {
+                    expiryError.textContent = 'Please enter valid expiry date (MM/YY)';
+                } else {
+                    const [month, year] = value.split('/');
+                    if (parseInt(month) > 12) {
+                        expiryError.textContent = 'Invalid month';
+                    } else {
+                        expiryError.textContent = '';
+                    }
+                }
+            });
+        }
+
+        // CVV validation
+        const cvvInput = document.getElementById('cvv');
+        if (cvvInput) {
+            cvvInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+                e.target.value = value;
+                
+                // Validation
+                const cvvError = document.getElementById('cvvError');
+                if (value.length < 3) {
+                    cvvError.textContent = 'Please enter 3-4 digits';
+                } else {
+                    cvvError.textContent = '';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

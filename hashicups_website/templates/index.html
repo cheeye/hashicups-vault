@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hashicups - Premium Coffee</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <img src="{{ url_for('static', filename='images/hashicorp.png') }}" alt="Hashicorp Logo" class="header-logo">
+            <h1>Hashicups</h1>
+        </header>
+
+        <div class="products-grid">
+            {% for product in products %}
+            <div class="product-card">
+                <img src="{{ url_for('static', filename='images/' + product.image) }}" 
+                     alt="{{ product.name }}" 
+                     class="product-image">
+                <h3 class="product-name">{{ product.name }}</h3>
+                <form action="{{ url_for('buy') }}" method="POST">
+                    <input type="hidden" name="product" value="{{ product.name }}">
+                    <button type="submit" class="buy-button">Buy Now</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>
