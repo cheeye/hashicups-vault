@@ -10,6 +10,12 @@ The deployment consists of:
 - **HashiCorp Vault**: Running as a supervised process via supervisorctl
 - **Vault Agent**: Acts as a cache and API proxy for the HashiCups application to securely interact with Vault
 
+## Architecture Diagram
+
+![HashiCups Vault Architecture](./images/reference-architecture.png)
+
+*Figure 1: High-level architecture diagram showing HashiCups, Vault, and Vault Agent integration*
+
 ## Prerequisites
 
 - A new virtual machine with Ubuntu or RHEL OS
