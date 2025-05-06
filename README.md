@@ -48,7 +48,7 @@ Choose the appropriate script for your operating system (Ubuntu or RHEL) from th
 
 ```bash
 # Download the script
-curl -o setup.sh https://raw.githubusercontent.com/shriram2712/hashicups-vault/main/setup-[ubuntu|rhel].sh
+curl -o setup.sh https://raw.githubusercontent.com/shriram2712/hashicups-vault/main/setup-vault-[ubuntu|redhat].sh
 
 # Make it executable
 chmod +x setup.sh
