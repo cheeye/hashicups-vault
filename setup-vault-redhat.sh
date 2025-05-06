@@ -573,8 +573,8 @@ if ! /usr/local/bin/vault read database/roles/dynamic-creds &>/dev/null; then
           GRANT SELECT, INSERT, UPDATE, DELETE ON public.transactions TO \"{{name}}\";
           GRANT USAGE, SELECT ON SEQUENCE transactions_id_seq TO \"{{name}}\";" \
         revocation_statements="DROP ROLE IF EXISTS \"{{name}}\";" \
-        default_ttl="30m" \
-        max_ttl="24h"        
+        default_ttl="8h" \
+        max_ttl="72h"        
     echo "Dynamic credentials role created with 30-minute TTL."
 else
     echo "Dynamic credentials role already exists."
