@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+exec &> /proc/1/fd/1
+
 # Check if VAULT_CONFIG environment variable is set
 if [ -z "${VAULT_CONFIG}" ]; then
     echo "Error: VAULT_CONFIG environment variable is not set"

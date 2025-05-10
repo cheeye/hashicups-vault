@@ -5,13 +5,13 @@ FROM base AS builder
 ARG PRODUCT_VERSION=1.19.3+ent
 RUN export OS=$(uname -s | tr '[:upper:]' '[:lower:]') && \
     export ARCH=$(uname -m) && \
-    wget https://releases.hashicorp.com/vault/${PRODUCT_VERSION}/${NAME}_${PRODUCT_VERSION}_${OS}_${ARCH}.zip -O /tmp/vault.zip && \
-    unzip /tmp/vault.zip -d /tmp && \
-    chmod +x /tmp/vault
+    wget https://releases.hashicorp.com/${NAME}/${PRODUCT_VERSION}/${NAME}_${PRODUCT_VERSION}_${OS}_${ARCH}.zip -O /tmp/${NAME}.zip && \
+    unzip /tmp/${NAME}.zip -d /tmp && \
+    chmod +x /tmp/${NAME}
 
 
 FROM base AS vault
-COPY --from=builder /tmp/vault /usr/bin/vault
+COPY --from=builder /tmp/${NAME} /usr/bin/${NAME}
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 
