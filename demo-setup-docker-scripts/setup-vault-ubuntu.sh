@@ -51,18 +51,92 @@ else
     echo "Docker is already installed."
 fi
 
+# Install Docker-Compose with better error handling
 ###########
-# Install Docker-Compose
-###########
-if ! command -v docker-compose &> /dev/null; then
-    echo "Docker Compose not found. Installing..."
-    sudo curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
-    echo "Docker Compose installation complete."
-else
-    echo "Docker Compose is already installed."
-fi
+install_docker_compose() {
+  echo "Installing Docker Compose..."
+  
+  # First, remove any existing failed installation
+  sudo rm -f /usr/local/bin/docker-compose
+  
+  # Detect architecture
+  ARCH=$(uname -m)
+  OS=$(uname -s)
+  
+  # Latest stable version (you can change this as needed)
+  COMPOSE_VERSION="v2.24.5"
+  
+  # For newer Docker Compose v2 (recommended)
+  echo "Downloading Docker Compose ${COMPOSE_VERSION}..."
+  
+  # Create a temporary directory for downloads
+  TEMP_DIR=$(mktemp -d)
+  cd "$TEMP_DIR" || exit 1
+  
+  # Download Docker Compose binary appropriate for this architecture
+  if [ "$ARCH" = "x86_64" ]; then
+    echo "Detected x86_64 architecture"
+    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-${ARCH}" -o /usr/local/bin/docker-compose
+  elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+    echo "Detected ARM64 architecture"
+    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-aarch64" -o /usr/local/bin/docker-compose
+  elif [ "$ARCH" = "s390x" ]; then
+    echo "Detected s390x architecture"
+    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-s390x" -o /usr/local/bin/docker-compose
+  elif [ "$ARCH" = "ppc64le" ]; then
+    echo "Detected ppc64le architecture"
+    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-ppc64le" -o /usr/local/bin/docker-compose
+  else
+    echo "Architecture $ARCH not directly supported - trying x86_64 version"
+    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-x86_64" -o /usr/local/bin/docker-compose
+  fi
+  
+  # Verify the download was successful
+  if [ ! -s /usr/local/bin/docker-compose ]; then
+    echo "Docker Compose download failed or resulted in empty file."
+    echo "Trying alternative approach with Docker Compose plugin..."
+    
+    # Alternative: Use Docker CLI plugin
+    mkdir -p ~/.docker/cli-plugins/
+    curl -SL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-${ARCH}" -o ~/.docker/cli-plugins/docker-compose
+    chmod +x ~/.docker/cli-plugins/docker-compose
+    
+    # Create symlink for compatibility
+    sudo ln -sf ~/.docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+    
+    # Alternative 2: Install through package manager if available
+    if command -v apt-get &> /dev/null; then
+      echo "Trying installation through apt..."
+      sudo apt-get update
+      sudo apt-get install -y docker-compose
+    elif command -v yum &> /dev/null; then
+      echo "Trying installation through yum..."
+      sudo yum install -y docker-compose
+    fi
+  fi
+  
+  # Make executable
+  sudo chmod +x /usr/local/bin/docker-compose
+  
+  # Clean up
+  cd - > /dev/null
+  rm -rf "$TEMP_DIR"
+  
+  # Test installation
+  if docker-compose --version; then
+    echo "Docker Compose installation successful."
+  else
+    echo "WARNING: Docker Compose installation may have failed. Please install manually."
+  fi
+}
 
+# Check if docker-compose is installed and working
+if ! command -v docker-compose &> /dev/null || ! docker-compose --version &> /dev/null; then
+  echo "Docker Compose not found or not working properly. Installing..."
+  install_docker_compose
+else
+  echo "Docker Compose is already installed. Version: $(docker-compose --version)"
+fi
 echo "Setup complete. Please log out and log back in for group changes to take effect."
 
 ###########
