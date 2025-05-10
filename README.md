@@ -2,6 +2,8 @@
 
 This repository contains shell scripts for deploying HashiCups with HashiCorp Vault integration on Ubuntu and RHEL operating systems.
 
+**Note**: Any docker images used as a part of this repository are sandbox images and not officially supported images, They are not recommended to be used for production environments
+
 ## Architecture Overview
 
 The deployment consists of:
