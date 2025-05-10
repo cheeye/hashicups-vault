@@ -188,19 +188,24 @@ else
     echo "PostgreSQL connection is already configured."
 fi
 
-# Check and create dynamic credentials role if it doesn't exist
-if ! vault read database/roles/dynamic-creds &>/dev/null; then
+###########
+# Check and create dynamic credentials role for database access
+###########
+if ! /usr/local/bin/vault read database/roles/dynamic-creds &>/dev/null; then
     echo "Creating dynamic credentials role..."
-    vault write database/roles/dynamic-creds \
+    /usr/local/bin/vault write database/roles/dynamic-creds \
         db_name=postgres \
         creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
           GRANT USAGE ON SCHEMA public TO \"{{name}}\";
-          GRANT SELECT, INSERT, UPDATE, DELETE ON public.transactions TO \"{{name}}\";
-          GRANT USAGE, SELECT ON SEQUENCE transactions_id_seq TO \"{{name}}\";" \
-        revocation_statements="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = '{{name}}'; DROP ROLE IF EXISTS \"{{name}}\";" \
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";" \
+        revocation_statements="REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
+          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
+          REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
+          DROP ROLE IF EXISTS \"{{name}}\";" \
         default_ttl="8h" \
         max_ttl="72h"        
-    echo "Dynamic credentials role created with 30-minute TTL."
+    echo "Dynamic credentials role created with 8-hour TTL."
 else
     echo "Dynamic credentials role already exists."
 fi
