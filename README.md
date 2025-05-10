@@ -22,7 +22,7 @@ The deployment consists of:
 - Sufficient permissions to execute scripts and install packages
 - Internet connectivity for downloading dependencies
 
-## Deployment Instructions
+## Deployment Instructions for Docker
 
 ### 1. Set Up License File
 
@@ -57,7 +57,7 @@ chmod +x setup.sh
 sudo ./setup.sh
 ```
 
-## Setup Script Overview
+### 3. Setup Script Overview
 
 The setup scripts perform the following operations:
 
@@ -79,13 +79,13 @@ The setup scripts perform the following operations:
    * Pull and start HashiCups Docker containers
    * Configure HashiCups to communicate with Vault via Vault Agent
 
-## Accessing the Application
+### 4. Accessing the Application
 
 Once deployment is complete:
 * **HashiCups UI**: http://[VM-IP]:8080
 * **Vault UI**: http://[VM-IP]:8200
 
-### Important: Firewall Configuration
+### 5. Important: Firewall Configuration
 
 You must configure your firewall to expose ports 8200 and 5000 externally to access the user interfaces:
 * **Port 8200**: Required for accessing the Vault UI
@@ -103,7 +103,7 @@ sudo iptables -A INPUT -p tcp --dport 8200 -j ACCEPT
 sudo iptables -A INPUT -p tcp --dport 5000 -j ACCEPT
 ```
 
-## Troubleshooting
+### 6. Troubleshooting
 
 If you encounter issues during setup:
 1. Check logs with `docker logs [container_id]` for HashiCups issues
