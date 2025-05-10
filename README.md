@@ -35,7 +35,7 @@ git clone https://github.com/shriram2712/hashicups-vault.git
 ### 2. Create and place the license file in the docker-compose/vault-config directory in the cloned github repo. An example file has been placed where the license.hclic is expected to be
 
 ```bash
-cd $(pwd)/hashicups-vault/docker-compose/vault-config/license.hclic
+touch $(pwd)/hashicups-vault/docker-compose/vault-config/license.hclic
 ```
 
 ### 3. Create a .env file in the docker-compose directory in the cloned github repo. An example file has been placed where the .env file is expected. Replace the values with the actual values you would like to deploy Postgres with and the host path
