@@ -22,6 +22,71 @@ The deployment consists of:
 - Sufficient permissions to execute scripts and install packages
 - Internet connectivity for downloading dependencies
 
+## Deployment Instructions for Docker Compose
+
+### 1. Clone this github repository
+
+```bash
+git clone https://github.com/shriram2712/hashicups-vault.git
+```
+
+### 2. Create and place the license file in the docker-compose/vault-config directory in the cloned github repo. An example file has been placed where the license.hclic is expected to be
+
+```bash
+cd $(pwd)/hashicups-vault/docker-compose/vault-config/license.hclic
+```
+
+### 3. Create a .env file in the docker-compose directory in the cloned github repo. An example file has been placed where the .env file is expected. Replace the values with the actual values you would like to deploy Postgres with and the host path
+
+```
+#Example values
+POSTGRES_USER=<PG_USER>
+POSTGRES_PASSWORD=<PG_PASSWORD>
+POSTGRES_DB=<PG_DB
+HOST_PATH=.
+```
+
+### 4. Make sure the docker and docker-compose are installed in the host machine. Reference scripts are in the demo-setup-docker-scripts folder.
+
+### 5. Start the containers
+
+```bash
+cd $(pwd)/hashicups-vault/docker-compose
+docker-compose up -d
+```
+
+### 6. Accessing the Application
+
+Once deployment is complete:
+* **HashiCups UI**: http://[VM-IP]:8080
+* **Vault UI**: http://[VM-IP]:8200
+
+### 7. Important: Firewall Configuration
+
+You must configure your firewall to expose ports 8200 and 5000 externally to access the user interfaces:
+* **Port 8200**: Required for accessing the Vault UI
+* **Port 5000**: Required for accessing parts of the HashiCups application
+
+Depending on your environment, you may need to:
+* Configure security groups (AWS/cloud)
+* Update iptables rules (Linux)
+* Modify network ACLs
+
+Example for iptables:
+
+```bash
+sudo iptables -A INPUT -p tcp --dport 8200 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 5000 -j ACCEPT
+```
+
+### 8. Troubleshooting
+
+If you encounter issues during setup:
+1. Check logs with `docker logs [container_id]` for all container issues 
+2. Ensure the license file is properly formatted and has correct permissions
+3. Verify network connectivity between components
+
+
 ## Deployment Instructions for Docker
 
 ### 1. Set Up License File
@@ -47,14 +112,14 @@ chmod 644 /home/$(whoami)/license.hclic
 Choose the appropriate script for your operating system (Ubuntu or RHEL) from the repository, create it on your VM, and make it executable:
 
 ```bash
-# Download the script
-curl -o setup.sh https://raw.githubusercontent.com/shriram2712/hashicups-vault/main/setup-vault-[ubuntu|redhat].sh
+# Download the script and choose your OS Type : currently ubuntu/debian and redhat/centos are supported
+curl -o setup.sh https://raw.githubusercontent.com/shriram2712/hashicups-vault/main/demo-setup-docker-scripts/setup-vault-[ubuntu|redhat].sh
 
-# Make it executable
-chmod +x setup.sh
+# Make it executable and replace the command with your chosen OS
+chmod +x setup-vault-[ubuntu|redhat].sh
 
-# Run the script
-sudo ./setup.sh
+# Run the script and replace the command with your chosen OS
+sudo ./setup-vault-[ubuntu|redhat].sh
 ```
 
 ### 3. Setup Script Overview
