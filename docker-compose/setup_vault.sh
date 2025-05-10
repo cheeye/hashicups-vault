@@ -191,9 +191,9 @@ fi
 ###########
 # Check and create dynamic credentials role for database access
 ###########
-if ! /usr/local/bin/vault read database/roles/dynamic-creds &>/dev/null; then
+if ! vault read database/roles/dynamic-creds &>/dev/null; then
     echo "Creating dynamic credentials role..."
-    /usr/local/bin/vault write database/roles/dynamic-creds \
+    vault write database/roles/dynamic-creds \
         db_name=postgres \
         creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
           GRANT USAGE ON SCHEMA public TO \"{{name}}\";
