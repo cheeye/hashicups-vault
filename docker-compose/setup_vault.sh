@@ -196,12 +196,14 @@ if ! vault read database/roles/dynamic-creds &>/dev/null; then
     vault write database/roles/dynamic-creds \
         db_name=postgres \
         creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
+          -- Grant only necessary permissions
           GRANT USAGE ON SCHEMA public TO \"{{name}}\";
           GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
           GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";
-          -- Explicitly deny ability to drop or alter tables
-          REVOKE CREATE ON SCHEMA public FROM \"{{name}}\";
-          REVOKE DROP ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";" \
+          
+          -- Do NOT grant privileges that would allow table structure modification
+          -- Note: We don't explicitly revoke DROP as it's not a base privilege type
+          -- Instead we simply don't grant the higher-level privileges needed for drop" \
         revocation_statements="
           -- Carefully constructed revocation that only removes access permissions
           REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
@@ -217,12 +219,13 @@ else
     vault write database/roles/dynamic-creds \
         db_name=postgres \
         creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
+          -- Grant only necessary permissions
           GRANT USAGE ON SCHEMA public TO \"{{name}}\";
           GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
           GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";
-          -- Explicitly deny ability to drop or alter tables
-          REVOKE CREATE ON SCHEMA public FROM \"{{name}}\";
-          REVOKE DROP ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";" \
+          
+          -- Do NOT grant privileges that would allow table structure modification
+          -- Note: We don't explicitly revoke DROP as it's not a base privilege type" \
         revocation_statements="
           -- Carefully constructed revocation that only removes access permissions
           REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
