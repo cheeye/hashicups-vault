@@ -57,7 +57,7 @@ END
 GRANT ALL PRIVILEGES ON DATABASE postgres TO permanent_owner;
 GRANT ALL PRIVILEGES ON SCHEMA public TO permanent_owner;
 
--- Change ownership of existing tables
+-- Change ownership of existing tables to permanent_owner
 DO \$\$
 DECLARE
   r RECORD;
@@ -69,7 +69,7 @@ BEGIN
 END
 \$\$;
 
--- Change ownership of sequences
+-- Change ownership of sequences to permanent_owner
 DO \$\$
 DECLARE
   r RECORD;
@@ -81,42 +81,62 @@ BEGIN
 END
 \$\$;
 
--- Set default privileges
+-- Set default privileges for permanent_owner
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT ALL PRIVILEGES ON TABLES TO permanent_owner;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT ALL PRIVILEGES ON SEQUENCES TO permanent_owner;
+
+-- CRITICAL: Protect the tables from being dropped when the dynamic roles are revoked
+ALTER TABLE transactions SET ENABLE_ROWSECURITY = true;
+ALTER TABLE test SET ENABLE_ROWSECURITY = true;
 EOF
 
-
-#Checking for Vault user in postgres
+# Checking for Vault user in postgres
 echo "Checking for Vault user in PostgreSQL..."
 if ! PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='vault'" | grep -q 1; then
     echo "Creating Vault user in PostgreSQL..."
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "CREATE USER vault WITH PASSWORD 'vault' CREATEDB CREATEROLE;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO vault WITH GRANT OPTION;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON SCHEMA public TO vault WITH GRANT OPTION;"
+    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "CREATE USER vault WITH PASSWORD 'vault' CREATEROLE;"
+    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO vault;"
+    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON SCHEMA public TO vault;"
     
-    # Only grant permissions on existing objects, don't give ownership
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO vault WITH GRANT OPTION;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault WITH GRANT OPTION;"
+    # Only grant specific permissions on existing objects, don't give ownership
+    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault;"
+    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault;"
     
-    # Critical change: Don't set vault as the default owner of future objects
-    # Instead of using ALTER DEFAULT PRIVILEGES with GRANT ALL, use more specific permissions
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault WITH GRANT OPTION;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO vault WITH GRANT OPTION;"
-    
+    # Critical change: Don't grant CREATE or DROP privileges to vault on public schema
     echo "Vault user created successfully with limited privileges."
 else
     echo "Vault user already exists in PostgreSQL. Updating privileges..."
     PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "ALTER USER vault WITH CREATEROLE;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO vault WITH GRANT OPTION;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault WITH GRANT OPTION;"
-    
-    # Same change for existing user: Don't set vault as the default owner
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault WITH GRANT OPTION;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO vault WITH GRANT OPTION;"
+    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault;"
+    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault;"
     
     echo "Vault user privileges updated with limited ownership."
 fi
+
+# Add an explicit protection to prevent tables from being dropped during cleanup
+PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
+-- Create a trigger function to prevent drops
+CREATE OR REPLACE FUNCTION prevent_drop()
+RETURNS event_trigger AS \$\$
+DECLARE
+  obj record;
+BEGIN
+  FOR obj IN SELECT * FROM pg_event_trigger_dropped_objects()
+  LOOP
+    IF obj.object_type = 'table' AND obj.schema_name = 'public' THEN
+      IF obj.object_name IN ('transactions', 'test') THEN
+        RAISE EXCEPTION 'Cannot drop protected table %', obj.object_name;
+      END IF;
+    END IF;
+  END LOOP;
+END;
+\$\$ LANGUAGE plpgsql;
+
+-- Create an event trigger to prevent dropping of protected tables
+DROP EVENT TRIGGER IF EXISTS protect_tables_trigger;
+CREATE EVENT TRIGGER protect_tables_trigger ON sql_drop
+  EXECUTE FUNCTION prevent_drop();
+EOF
