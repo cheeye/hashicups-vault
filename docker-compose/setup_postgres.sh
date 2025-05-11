@@ -91,6 +91,18 @@ GRANT ALL PRIVILEGES ON SEQUENCES TO permanent_owner;
 -- CRITICAL: Enable row-level security on tables (corrected syntax)
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE test ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies that ALLOW access for all operations by authorized users
+-- Allow SELECT, INSERT, UPDATE, DELETE for all rows to users with those privileges
+CREATE POLICY allow_all_transactions ON transactions 
+  FOR ALL 
+  TO PUBLIC 
+  USING (true);
+
+CREATE POLICY allow_all_test ON test 
+  FOR ALL 
+  TO PUBLIC 
+  USING (true);
 EOF
 
 # Checking for Vault user in postgres
@@ -139,13 +151,14 @@ END;
 DROP EVENT TRIGGER IF EXISTS protect_tables_trigger;
 CREATE EVENT TRIGGER protect_tables_trigger ON sql_drop
   EXECUTE FUNCTION prevent_drop();
+EOF
 
--- Create RLS policies to protect tables rather than trying to revoke DROP
--- Create a default deny policy for transactions table
-CREATE POLICY protect_transactions ON transactions
-  USING (true);
+# Ensure default privileges are properly set for new tables
+PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
+-- Set default privileges for future tables
+ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO PUBLIC;
 
--- Create a default deny policy for test table
-CREATE POLICY protect_test ON test
-  USING (true);
+-- Ensure vault can create roles
+GRANT CREATEROLE TO vault;
 EOF

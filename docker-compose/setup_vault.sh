@@ -201,9 +201,8 @@ if ! vault read database/roles/dynamic-creds &>/dev/null; then
           GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
           GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";
           
-          -- Do NOT grant privileges that would allow table structure modification
-          -- Note: We don't explicitly revoke DROP as it's not a base privilege type
-          -- Instead we simply don't grant the higher-level privileges needed for drop" \
+          -- Explicitly ensure the new role can access tables with RLS enabled
+          ALTER ROLE \"{{name}}\" BYPASSRLS;" \
         revocation_statements="
           -- Carefully constructed revocation that only removes access permissions
           REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
@@ -224,8 +223,8 @@ else
           GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
           GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";
           
-          -- Do NOT grant privileges that would allow table structure modification
-          -- Note: We don't explicitly revoke DROP as it's not a base privilege type" \
+          -- Explicitly ensure the new role can access tables with RLS enabled
+          ALTER ROLE \"{{name}}\" BYPASSRLS;" \
         revocation_statements="
           -- Carefully constructed revocation that only removes access permissions
           REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
