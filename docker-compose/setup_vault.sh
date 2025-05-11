@@ -196,67 +196,59 @@ if ! vault read database/roles/dynamic-creds &>/dev/null; then
     vault write database/roles/dynamic-creds \
         db_name=postgres \
         creation_statements="
+        -- Create the role with necessary privileges
         CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}' BYPASSRLS;
         
         -- Grant schema usage
         GRANT USAGE ON SCHEMA public TO \"{{name}}\";
         
-        -- Grant table access
+        -- Grant direct table access
         GRANT SELECT, INSERT, UPDATE, DELETE ON transactions TO \"{{name}}\";
         GRANT SELECT, INSERT, UPDATE, DELETE ON test TO \"{{name}}\";
         
-        -- Grant sequence access
+        -- Grant direct sequence access
         GRANT USAGE, SELECT ON transactions_id_seq TO \"{{name}}\";
-        GRANT USAGE, SELECT ON test_id_seq TO \"{{name}}\";
-        
-        -- Additional safety measure - explicitly allow bypassing RLS
-        ALTER ROLE \"{{name}}\" BYPASSRLS;" \
+        GRANT USAGE, SELECT ON test_id_seq TO \"{{name}}\";" \
         revocation_statements="
-        -- Revoke specific permissions first
-        REVOKE SELECT, INSERT, UPDATE, DELETE ON transactions FROM \"{{name}}\";
-        REVOKE SELECT, INSERT, UPDATE, DELETE ON test FROM \"{{name}}\";
-        REVOKE USAGE, SELECT ON transactions_id_seq FROM \"{{name}}\";
-        REVOKE USAGE, SELECT ON test_id_seq FROM \"{{name}}\";
+        -- Revoke all permissions
+        REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
+        REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
         REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
         
         -- Drop the role
         DROP ROLE IF EXISTS \"{{name}}\";" \
         default_ttl="8h" \
         max_ttl="72h"        
-    echo "Dynamic credentials role created with 8-hour TTL and safer permissions."
+    echo "Dynamic credentials role created with 8-hour TTL and direct permissions."
 else
     echo "Dynamic credentials role already exists. Updating with safer configuration..."
     vault write database/roles/dynamic-creds \
         db_name=postgres \
         creation_statements="
+        -- Create the role with necessary privileges
         CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}' BYPASSRLS;
         
         -- Grant schema usage
         GRANT USAGE ON SCHEMA public TO \"{{name}}\";
         
-        -- Grant table access
+        -- Grant direct table access
         GRANT SELECT, INSERT, UPDATE, DELETE ON transactions TO \"{{name}}\";
         GRANT SELECT, INSERT, UPDATE, DELETE ON test TO \"{{name}}\";
         
-        -- Grant sequence access
+        -- Grant direct sequence access
         GRANT USAGE, SELECT ON transactions_id_seq TO \"{{name}}\";
-        GRANT USAGE, SELECT ON test_id_seq TO \"{{name}}\";
-        
-        -- Additional safety measure - explicitly allow bypassing RLS
-        ALTER ROLE \"{{name}}\" BYPASSRLS;" \
+        GRANT USAGE, SELECT ON test_id_seq TO \"{{name}}\";" \
         revocation_statements="
-        -- Revoke specific permissions first
-        REVOKE SELECT, INSERT, UPDATE, DELETE ON transactions FROM \"{{name}}\";
-        REVOKE SELECT, INSERT, UPDATE, DELETE ON test FROM \"{{name}}\";
-        REVOKE USAGE, SELECT ON transactions_id_seq FROM \"{{name}}\";
-        REVOKE USAGE, SELECT ON test_id_seq FROM \"{{name}}\";
+        -- Revoke all permissions
+        REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
+        REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
         REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
         
         -- Drop the role
         DROP ROLE IF EXISTS \"{{name}}\";" \
         default_ttl="8h" \
         max_ttl="72h"
-    echo "Dynamic credentials role updated with safer configuration."
+    echo "Dynamic credentials role updated with direct permissions."
 fi
 
 ###########

@@ -157,22 +157,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public 
 GRANT USAGE, SELECT ON SEQUENCES TO vault;
-
--- Create a role for dynamic users that Vault will create
-CREATE ROLE vault_dynamic_users;
-
--- Grant necessary permissions to the vault_dynamic_users role
-GRANT CONNECT ON DATABASE postgres TO vault_dynamic_users;
-GRANT USAGE ON SCHEMA public TO vault_dynamic_users;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault_dynamic_users;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault_dynamic_users;
-
--- Set default privileges for future objects
-ALTER DEFAULT PRIVILEGES IN SCHEMA public 
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault_dynamic_users;
-
-ALTER DEFAULT PRIVILEGES IN SCHEMA public 
-GRANT USAGE, SELECT ON SEQUENCES TO vault_dynamic_users;
 EOF
 
 # Create trigger function and event trigger
