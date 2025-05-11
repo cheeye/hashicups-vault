@@ -56,6 +56,9 @@ END
 -- Grant necessary permissions
 GRANT ALL PRIVILEGES ON DATABASE postgres TO permanent_owner;
 GRANT ALL PRIVILEGES ON SCHEMA public TO permanent_owner;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO permanent_owner;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO permanent_owner;
+
 
 -- Change ownership of existing tables to permanent_owner
 DO \$\$
@@ -92,18 +95,14 @@ GRANT ALL PRIVILEGES ON SEQUENCES TO permanent_owner;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE test ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies that ALLOW access for all operations by authorized users
--- Allow SELECT, INSERT, UPDATE, DELETE for all rows to users with those privileges
+-- Create more explicit RLS policies
 CREATE POLICY allow_all_transactions ON transactions 
   FOR ALL 
-  TO PUBLIC 
   USING (true);
 
 CREATE POLICY allow_all_test ON test 
   FOR ALL 
-  TO PUBLIC 
   USING (true);
-EOF
 
 # Checking for Vault user in postgres
 echo "Checking for Vault user in PostgreSQL..."
@@ -112,6 +111,8 @@ if ! PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -tAc "SELECT 1
     PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "CREATE USER vault WITH PASSWORD 'vault' CREATEROLE;"
     PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO vault;"
     PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON SCHEMA public TO vault;"
+    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT CONNECT ON DATABASE postgres TO vault;"
+    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT USAGE ON SCHEMA public TO vault;"
     
     # Only grant specific permissions on existing objects, don't give ownership
     PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault;"
@@ -157,8 +158,14 @@ EOF
 PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
 -- Set default privileges for future tables
 ALTER DEFAULT PRIVILEGES IN SCHEMA public 
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault;
+GRANT USAGE, SELECT ON SEQUENCES TO vault;
+
 
 -- Ensure vault can create roles
 GRANT CREATEROLE TO vault;
+
+-- Set tables to allow everyone to bypass RLS (for testing)
+ALTER TABLE transactions FORCE ROW LEVEL SECURITY;
+ALTER TABLE test FORCE ROW LEVEL SECURITY;
 EOF

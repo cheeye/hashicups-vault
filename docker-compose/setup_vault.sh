@@ -195,21 +195,32 @@ if ! vault read database/roles/dynamic-creds &>/dev/null; then
     echo "Creating dynamic credentials role with safer configuration..."
     vault write database/roles/dynamic-creds \
         db_name=postgres \
-        creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
-          -- Grant only necessary permissions
-          GRANT USAGE ON SCHEMA public TO \"{{name}}\";
-          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
-          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";
-          
-          -- Explicitly ensure the new role can access tables with RLS enabled
-          ALTER ROLE \"{{name}}\" BYPASSRLS;" \
+        creation_statements="
+        CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}' BYPASSRLS;
+        
+        -- Grant schema usage
+        GRANT USAGE ON SCHEMA public TO \"{{name}}\";
+        
+        -- Grant table access
+        GRANT SELECT, INSERT, UPDATE, DELETE ON transactions TO \"{{name}}\";
+        GRANT SELECT, INSERT, UPDATE, DELETE ON test TO \"{{name}}\";
+        
+        -- Grant sequence access
+        GRANT USAGE, SELECT ON transactions_id_seq TO \"{{name}}\";
+        GRANT USAGE, SELECT ON test_id_seq TO \"{{name}}\";
+        
+        -- Additional safety measure - explicitly allow bypassing RLS
+        ALTER ROLE \"{{name}}\" BYPASSRLS;" \
         revocation_statements="
-          -- Carefully constructed revocation that only removes access permissions
-          REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
-          REVOKE USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
-          REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
-          -- Finally drop the role when all permissions have been safely revoked
-          DROP ROLE IF EXISTS \"{{name}}\";" \
+        -- Revoke specific permissions first
+        REVOKE SELECT, INSERT, UPDATE, DELETE ON transactions FROM \"{{name}}\";
+        REVOKE SELECT, INSERT, UPDATE, DELETE ON test FROM \"{{name}}\";
+        REVOKE USAGE, SELECT ON transactions_id_seq FROM \"{{name}}\";
+        REVOKE USAGE, SELECT ON test_id_seq FROM \"{{name}}\";
+        REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
+        
+        -- Drop the role
+        DROP ROLE IF EXISTS \"{{name}}\";" \
         default_ttl="8h" \
         max_ttl="72h"        
     echo "Dynamic credentials role created with 8-hour TTL and safer permissions."
@@ -217,21 +228,32 @@ else
     echo "Dynamic credentials role already exists. Updating with safer configuration..."
     vault write database/roles/dynamic-creds \
         db_name=postgres \
-        creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
-          -- Grant only necessary permissions
-          GRANT USAGE ON SCHEMA public TO \"{{name}}\";
-          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
-          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";
-          
-          -- Explicitly ensure the new role can access tables with RLS enabled
-          ALTER ROLE \"{{name}}\" BYPASSRLS;" \
+        creation_statements="
+        CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}' BYPASSRLS;
+        
+        -- Grant schema usage
+        GRANT USAGE ON SCHEMA public TO \"{{name}}\";
+        
+        -- Grant table access
+        GRANT SELECT, INSERT, UPDATE, DELETE ON transactions TO \"{{name}}\";
+        GRANT SELECT, INSERT, UPDATE, DELETE ON test TO \"{{name}}\";
+        
+        -- Grant sequence access
+        GRANT USAGE, SELECT ON transactions_id_seq TO \"{{name}}\";
+        GRANT USAGE, SELECT ON test_id_seq TO \"{{name}}\";
+        
+        -- Additional safety measure - explicitly allow bypassing RLS
+        ALTER ROLE \"{{name}}\" BYPASSRLS;" \
         revocation_statements="
-          -- Carefully constructed revocation that only removes access permissions
-          REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
-          REVOKE USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
-          REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
-          -- Finally drop the role when all permissions have been safely revoked
-          DROP ROLE IF EXISTS \"{{name}}\";" \
+        -- Revoke specific permissions first
+        REVOKE SELECT, INSERT, UPDATE, DELETE ON transactions FROM \"{{name}}\";
+        REVOKE SELECT, INSERT, UPDATE, DELETE ON test FROM \"{{name}}\";
+        REVOKE USAGE, SELECT ON transactions_id_seq FROM \"{{name}}\";
+        REVOKE USAGE, SELECT ON test_id_seq FROM \"{{name}}\";
+        REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
+        
+        -- Drop the role
+        DROP ROLE IF EXISTS \"{{name}}\";" \
         default_ttl="8h" \
         max_ttl="72h"
     echo "Dynamic credentials role updated with safer configuration."
