@@ -1,11 +1,20 @@
-#!/bin/sh
+#!/bin/bash
+
+# Wait for PostgreSQL to be ready
+echo "Waiting for PostgreSQL to be ready..."
+until PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c '\q'; do
+  echo "PostgreSQL is unavailable - sleeping"
+  sleep 1
+done
+
+echo "PostgreSQL is up - executing setup"
+
 ###########
-# Create PostgreSQL Tables and Configure Access
+# Create PostgreSQL Tables
 ###########
 echo "Creating PostgreSQL tables..."
 
-# Create SQL file for table creation
-cat << EOF > /tmp/create_tables.sql
+PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
 -- Create transactions table
 CREATE TABLE IF NOT EXISTS transactions (
     id SERIAL PRIMARY KEY,
@@ -30,19 +39,11 @@ INSERT INTO test (name) VALUES
     ('Test User 4');
 EOF
 
-# Execute SQL file to create tables
-echo "Executing SQL file to create tables..."
-PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -f /tmp/create_tables.sql
-
-# Remove the temporary SQL file
-rm /tmp/create_tables.sql
-
-echo "PostgreSQL tables created successfully."
-
 ###########
 # Create permanent owner for tables
 ###########
 echo "Creating permanent user for table ownership..."
+
 PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
 -- Create permanent user for table ownership
 DO \$\$
@@ -58,7 +59,6 @@ GRANT ALL PRIVILEGES ON DATABASE postgres TO permanent_owner;
 GRANT ALL PRIVILEGES ON SCHEMA public TO permanent_owner;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO permanent_owner;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO permanent_owner;
-
 
 -- Change ownership of existing tables to permanent_owner
 DO \$\$
@@ -91,11 +91,11 @@ GRANT ALL PRIVILEGES ON TABLES TO permanent_owner;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT ALL PRIVILEGES ON SEQUENCES TO permanent_owner;
 
--- CRITICAL: Enable row-level security on tables (corrected syntax)
+-- Enable row-level security on tables
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE test ENABLE ROW LEVEL SECURITY;
 
--- Create more explicit RLS policies
+-- Create RLS policies
 CREATE POLICY allow_all_transactions ON transactions 
   FOR ALL 
   USING (true);
@@ -103,35 +103,34 @@ CREATE POLICY allow_all_transactions ON transactions
 CREATE POLICY allow_all_test ON test 
   FOR ALL 
   USING (true);
+EOF
 
-# Checking for Vault user in postgres
-echo "Checking for Vault user in PostgreSQL..."
-if ! PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='vault'" | grep -q 1; then
-    echo "Creating Vault user in PostgreSQL..."
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "CREATE USER vault WITH PASSWORD 'vault' CREATEROLE;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO vault;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON SCHEMA public TO vault;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT CONNECT ON DATABASE postgres TO vault;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT USAGE ON SCHEMA public TO vault;"
-    
-    # Only grant specific permissions on existing objects, don't give ownership
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault;"
-    
-    # Critical change: Don't grant CREATE or DROP privileges to vault on public schema
-    echo "Vault user created successfully with limited privileges."
-else
-    echo "Vault user already exists in PostgreSQL. Updating privileges..."
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "ALTER USER vault WITH CREATEROLE;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault;"
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault;"
-    
-    echo "Vault user privileges updated with limited ownership."
-fi
+###########
+# Create and configure Vault user
+###########
+echo "Creating Vault user in PostgreSQL..."
 
-# Add an explicit protection to prevent tables from being dropped during cleanup
 PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
--- Create a trigger function to prevent drops
+-- Create Vault user if it doesn't exist
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'vault') THEN
+    CREATE USER vault WITH PASSWORD 'vault' CREATEROLE;
+  END IF;
+END
+\$\$;
+
+-- Grant basic privileges
+GRANT ALL PRIVILEGES ON DATABASE postgres TO vault;
+GRANT ALL PRIVILEGES ON SCHEMA public TO vault;
+GRANT CONNECT ON DATABASE postgres TO vault;
+GRANT USAGE ON SCHEMA public TO vault;
+
+-- Grant specific permissions on existing objects
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault;
+
+-- Create trigger function to prevent drops
 CREATE OR REPLACE FUNCTION prevent_drop()
 RETURNS event_trigger AS \$\$
 DECLARE
@@ -148,19 +147,17 @@ BEGIN
 END;
 \$\$ LANGUAGE plpgsql;
 
--- Create an event trigger to prevent dropping of protected tables
+-- Create the event trigger
 DROP EVENT TRIGGER IF EXISTS protect_tables_trigger;
 CREATE EVENT TRIGGER protect_tables_trigger ON sql_drop
   EXECUTE FUNCTION prevent_drop();
-EOF
 
-# Ensure default privileges are properly set for new tables
-PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
--- Set default privileges for future tables
+-- Set default privileges for future objects
 ALTER DEFAULT PRIVILEGES IN SCHEMA public 
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault;
-GRANT USAGE, SELECT ON SEQUENCES TO vault;
 
+ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+GRANT USAGE, SELECT ON SEQUENCES TO vault;
 
 -- Ensure vault can create roles
 GRANT CREATEROLE TO vault;
@@ -169,3 +166,5 @@ GRANT CREATEROLE TO vault;
 ALTER TABLE transactions FORCE ROW LEVEL SECURITY;
 ALTER TABLE test FORCE ROW LEVEL SECURITY;
 EOF
+
+echo "PostgreSQL setup completed successfully"
