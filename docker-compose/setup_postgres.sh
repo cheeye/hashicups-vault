@@ -106,6 +106,15 @@ CREATE POLICY allow_all_test ON test
   FOR ALL 
   USING (true)
   WITH CHECK (true);
+
+-- Grant usage on schema to public role (needed for dynamic users)
+GRANT USAGE ON SCHEMA public TO public;
+
+-- Grant specific privileges to public role (needed for dynamic users)
+GRANT SELECT, INSERT, UPDATE, DELETE ON transactions TO public;
+GRANT SELECT, INSERT, UPDATE, DELETE ON test TO public;
+GRANT USAGE, SELECT ON transactions_id_seq TO public;
+GRANT USAGE, SELECT ON test_id_seq TO public;
 EOF
 
 ###########

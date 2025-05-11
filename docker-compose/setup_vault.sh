@@ -203,12 +203,17 @@ if ! vault read database/roles/dynamic-creds &>/dev/null; then
         GRANT USAGE ON SCHEMA public TO \"{{name}}\";
         
         -- Grant direct table access
-        GRANT SELECT, INSERT, UPDATE, DELETE ON transactions TO \"{{name}}\";
-        GRANT SELECT, INSERT, UPDATE, DELETE ON test TO \"{{name}}\";
+        GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
         
         -- Grant direct sequence access
-        GRANT USAGE, SELECT ON transactions_id_seq TO \"{{name}}\";
-        GRANT USAGE, SELECT ON test_id_seq TO \"{{name}}\";" \
+        GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";
+        
+        -- Set default privileges for future objects
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO \"{{name}}\";
+        
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+        GRANT USAGE, SELECT ON SEQUENCES TO \"{{name}}\";" \
         revocation_statements="
         -- Revoke all permissions
         REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
@@ -232,12 +237,17 @@ else
         GRANT USAGE ON SCHEMA public TO \"{{name}}\";
         
         -- Grant direct table access
-        GRANT SELECT, INSERT, UPDATE, DELETE ON transactions TO \"{{name}}\";
-        GRANT SELECT, INSERT, UPDATE, DELETE ON test TO \"{{name}}\";
+        GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
         
         -- Grant direct sequence access
-        GRANT USAGE, SELECT ON transactions_id_seq TO \"{{name}}\";
-        GRANT USAGE, SELECT ON test_id_seq TO \"{{name}}\";" \
+        GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";
+        
+        -- Set default privileges for future objects
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO \"{{name}}\";
+        
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+        GRANT USAGE, SELECT ON SEQUENCES TO \"{{name}}\";" \
         revocation_statements="
         -- Revoke all permissions
         REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
