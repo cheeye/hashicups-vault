@@ -95,13 +95,17 @@ ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE test ENABLE ROW LEVEL SECURITY;
 
 -- Create more explicit RLS policies
+DROP POLICY IF EXISTS allow_all_transactions ON transactions;
 CREATE POLICY allow_all_transactions ON transactions 
   FOR ALL 
-  USING (true);
+  USING (true)
+  WITH CHECK (true);
 
+DROP POLICY IF EXISTS allow_all_test ON test;
 CREATE POLICY allow_all_test ON test 
   FOR ALL 
-  USING (true);
+  USING (true)
+  WITH CHECK (true);
 EOF
 
 ###########
@@ -123,13 +127,6 @@ if [ -z "$VAULT_EXISTS" ]; then
     GRANT ALL PRIVILEGES ON SCHEMA public TO vault;
     GRANT CONNECT ON DATABASE postgres TO vault;
     GRANT USAGE ON SCHEMA public TO vault;
-    
-    -- Grant object privileges
-    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault;
-    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault;
-    
-    -- Grant role creation privileges
-    ALTER USER vault WITH CREATEROLE;
 EOF
     echo "Vault user created successfully with limited privileges."
 else
@@ -137,11 +134,46 @@ else
     PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
     -- Update vault user privileges
     ALTER USER vault WITH CREATEROLE BYPASSRLS;
-    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault;
-    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault;
+    GRANT ALL PRIVILEGES ON SCHEMA public TO vault;
+    GRANT USAGE ON SCHEMA public TO vault;
 EOF
     echo "Vault user privileges updated with limited ownership."
 fi
+
+# Grant specific privileges on existing objects
+echo "Granting specific privileges on existing objects..."
+PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
+-- Grant specific privileges on tables
+GRANT SELECT, INSERT, UPDATE, DELETE ON transactions TO vault;
+GRANT SELECT, INSERT, UPDATE, DELETE ON test TO vault;
+
+-- Grant specific privileges on sequences
+GRANT USAGE, SELECT ON transactions_id_seq TO vault;
+GRANT USAGE, SELECT ON test_id_seq TO vault;
+
+-- Set default privileges for future objects
+ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+GRANT USAGE, SELECT ON SEQUENCES TO vault;
+
+-- Create a role for dynamic users that Vault will create
+CREATE ROLE vault_dynamic_users;
+
+-- Grant necessary permissions to the vault_dynamic_users role
+GRANT CONNECT ON DATABASE postgres TO vault_dynamic_users;
+GRANT USAGE ON SCHEMA public TO vault_dynamic_users;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault_dynamic_users;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault_dynamic_users;
+
+-- Set default privileges for future objects
+ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault_dynamic_users;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+GRANT USAGE, SELECT ON SEQUENCES TO vault_dynamic_users;
+EOF
 
 # Create trigger function and event trigger
 echo "Creating protection triggers..."
@@ -163,21 +195,18 @@ BEGIN
 END;
 \$\$ LANGUAGE plpgsql;
 
+-- Drop existing event trigger if it exists
+DO \$\$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_event_trigger WHERE evtname = 'protect_tables_trigger') THEN
+    DROP EVENT TRIGGER protect_tables_trigger;
+  END IF;
+END
+\$\$;
+
 -- Create the event trigger
-DROP EVENT TRIGGER IF EXISTS protect_tables_trigger;
 CREATE EVENT TRIGGER protect_tables_trigger ON sql_drop
   EXECUTE FUNCTION prevent_drop();
-EOF
-
-# Set default privileges and final configurations
-echo "Setting up final configurations..."
-PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
--- Set default privileges for future tables
-ALTER DEFAULT PRIVILEGES IN SCHEMA public 
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault;
-
-ALTER DEFAULT PRIVILEGES IN SCHEMA public 
-GRANT USAGE, SELECT ON SEQUENCES TO vault;
 
 -- Set tables to allow everyone to bypass RLS (for testing)
 ALTER TABLE transactions FORCE ROW LEVEL SECURITY;
