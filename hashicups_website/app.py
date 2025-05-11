@@ -144,6 +144,45 @@ def submit():
     # Get card data from form
     card_number = request.form.get('number', '').replace(' ', '')
     name = request.form.get('name', '')
+    cvv = request.form.get('cvv', '')
+    expiry = request.form.get('expiry', '')
+    
+    # Validate CVV
+    if not cvv.isdigit() or len(cvv) not in [3, 4]:
+        return render_template(
+            'payment.html',
+            submitted=True,
+            success=False,
+            error="Invalid CVV. Please enter 3 or 4 digits."
+        )
+    
+    # Validate expiry date
+    try:
+        month, year = expiry.split('/')
+        month = int(month)
+        year = int(year)
+        if not (1 <= month <= 12):
+            return render_template(
+                'payment.html',
+                submitted=True,
+                success=False,
+                error="Invalid expiry month. Please enter a month between 01 and 12."
+            )
+        current_year = datetime.now().year % 100
+        if year < current_year or (year == current_year and month < datetime.now().month):
+            return render_template(
+                'payment.html',
+                submitted=True,
+                success=False,
+                error="Card has expired."
+            )
+    except (ValueError, AttributeError):
+        return render_template(
+            'payment.html',
+            submitted=True,
+            success=False,
+            error="Invalid expiry date format. Please use MM/YY."
+        )
     
     # Process card data with Vault
     card_transit = encrypt_transit(card_number)

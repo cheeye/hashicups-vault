@@ -65,6 +65,12 @@
         </div>
         {% else %}
         <div class="payment-container">
+            {% if error %}
+            <div class="error-message">
+                <h2>Error</h2>
+                <p>{{ error }}</p>
+            </div>
+            {% else %}
             <div class="success-message">
                 <h2>Payment Processed!</h2>
                 <p>Thank you for your purchase, {{ name }}.</p>
@@ -74,6 +80,7 @@
                 <p>Note: There was an issue saving your transaction. Please contact support.</p>
                 {% endif %}
             </div>
+            {% endif %}
 
             <div class="status-container">
                 <h3>Vault Security Demo</h3>
@@ -166,12 +173,15 @@
         if (cvvInput) {
             cvvInput.addEventListener('input', function(e) {
                 let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+                value = value.slice(0, 4); // Limit to 4 digits
                 e.target.value = value;
                 
                 // Validation
                 const cvvError = document.getElementById('cvvError');
                 if (value.length < 3) {
                     cvvError.textContent = 'Please enter 3-4 digits';
+                } else if (value.length > 4) {
+                    cvvError.textContent = 'CVV cannot be more than 4 digits';
                 } else {
                     cvvError.textContent = '';
                 }
