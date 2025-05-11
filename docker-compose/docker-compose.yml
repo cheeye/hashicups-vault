@@ -21,6 +21,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - ${HOST_PATH}/pgdata:/var/lib/postgresql/data
+      - ${HOST_PATH}/docker-compose/init.sql:/docker-entrypoint-initdb.d/init.sql
   postgres-setup:
     image: postgres:latest
     container_name: postgres-setup
@@ -28,7 +29,7 @@ services:
       postgres:
         condition: service_started
     volumes:
-      - ${HOST_PATH}:/scripts
+      - ${HOST_PATH}/docker-compose:/scripts
     entrypoint: >
       bash -c "until pg_isready -h postgres -p 5432; do sleep 1; done; sh /scripts/setup_postgres.sh"
   vault-setup:
