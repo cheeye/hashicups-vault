@@ -215,12 +215,12 @@ if ! vault read database/roles/dynamic-creds &>/dev/null; then
         ALTER DEFAULT PRIVILEGES IN SCHEMA public 
         GRANT USAGE, SELECT ON SEQUENCES TO \"{{name}}\";" \
         revocation_statements="
-        -- Revoke all permissions
-        REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
-        REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
+        -- Revoke specific privileges first
+        REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
+        REVOKE USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
         REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
         
-        -- Drop the role
+        -- Drop only the dynamic role
         DROP ROLE IF EXISTS \"{{name}}\";" \
         default_ttl="8h" \
         max_ttl="72h"        
@@ -249,12 +249,12 @@ else
         ALTER DEFAULT PRIVILEGES IN SCHEMA public 
         GRANT USAGE, SELECT ON SEQUENCES TO \"{{name}}\";" \
         revocation_statements="
-        -- Revoke all permissions
-        REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
-        REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
+        -- Revoke specific privileges first
+        REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
+        REVOKE USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
         REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
         
-        -- Drop the role
+        -- Drop only the dynamic role
         DROP ROLE IF EXISTS \"{{name}}\";" \
         default_ttl="8h" \
         max_ttl="72h"
