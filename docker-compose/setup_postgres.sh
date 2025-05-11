@@ -115,19 +115,28 @@ VAULT_EXISTS=$(PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -tAc
 if [ -z "$VAULT_EXISTS" ]; then
     echo "Creating Vault user in PostgreSQL..."
     PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
-    CREATE USER vault WITH PASSWORD 'vault' CREATEROLE;
+    -- Create vault user with necessary privileges
+    CREATE USER vault WITH PASSWORD 'vault' CREATEROLE BYPASSRLS;
+    
+    -- Grant database privileges
     GRANT ALL PRIVILEGES ON DATABASE postgres TO vault;
     GRANT ALL PRIVILEGES ON SCHEMA public TO vault;
     GRANT CONNECT ON DATABASE postgres TO vault;
     GRANT USAGE ON SCHEMA public TO vault;
+    
+    -- Grant object privileges
     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault;
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault;
+    
+    -- Grant role creation privileges
+    ALTER USER vault WITH CREATEROLE;
 EOF
     echo "Vault user created successfully with limited privileges."
 else
     echo "Vault user already exists in PostgreSQL. Updating privileges..."
     PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
-    ALTER USER vault WITH CREATEROLE;
+    -- Update vault user privileges
+    ALTER USER vault WITH CREATEROLE BYPASSRLS;
     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vault;
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault;
 EOF
@@ -169,9 +178,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public 
 GRANT USAGE, SELECT ON SEQUENCES TO vault;
-
--- Ensure vault can create roles
-GRANT CREATEROLE TO vault;
 
 -- Set tables to allow everyone to bypass RLS (for testing)
 ALTER TABLE transactions FORCE ROW LEVEL SECURITY;
