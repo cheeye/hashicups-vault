@@ -108,18 +108,92 @@ else
     echo "Docker is already installed."
 fi
 
+# Install Docker-Compose with better error handling
 ###########
-# Install Docker-Compose
-###########
-if ! command -v docker-compose &> /dev/null; then
-    echo "Docker Compose not found. Installing..."
-    sudo curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
-    echo "Docker Compose installation complete."
-else
-    echo "Docker Compose is already installed."
-fi
+install_docker_compose() {
+  echo "Installing Docker Compose..."
+  
+  # First, remove any existing failed installation
+  sudo rm -f /usr/local/bin/docker-compose
+  
+  # Detect architecture
+  ARCH=$(uname -m)
+  OS=$(uname -s)
+  
+  # Latest stable version (you can change this as needed)
+  COMPOSE_VERSION="v2.24.5"
+  
+  # For newer Docker Compose v2 (recommended)
+  echo "Downloading Docker Compose ${COMPOSE_VERSION}..."
+  
+  # Create a temporary directory for downloads
+  TEMP_DIR=$(mktemp -d)
+  cd "$TEMP_DIR" || exit 1
+  
+  # Download Docker Compose binary appropriate for this architecture
+  if [ "$ARCH" = "x86_64" ]; then
+    echo "Detected x86_64 architecture"
+    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-${ARCH}" -o /usr/local/bin/docker-compose
+  elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+    echo "Detected ARM64 architecture"
+    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-aarch64" -o /usr/local/bin/docker-compose
+  elif [ "$ARCH" = "s390x" ]; then
+    echo "Detected s390x architecture"
+    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-s390x" -o /usr/local/bin/docker-compose
+  elif [ "$ARCH" = "ppc64le" ]; then
+    echo "Detected ppc64le architecture"
+    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-ppc64le" -o /usr/local/bin/docker-compose
+  else
+    echo "Architecture $ARCH not directly supported - trying x86_64 version"
+    sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-x86_64" -o /usr/local/bin/docker-compose
+  fi
+  
+  # Verify the download was successful
+  if [ ! -s /usr/local/bin/docker-compose ]; then
+    echo "Docker Compose download failed or resulted in empty file."
+    echo "Trying alternative approach with Docker Compose plugin..."
+    
+    # Alternative: Use Docker CLI plugin
+    mkdir -p ~/.docker/cli-plugins/
+    curl -SL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-${OS}-${ARCH}" -o ~/.docker/cli-plugins/docker-compose
+    chmod +x ~/.docker/cli-plugins/docker-compose
+    
+    # Create symlink for compatibility
+    sudo ln -sf ~/.docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+    
+    # Alternative 2: Install through package manager if available
+    if command -v apt-get &> /dev/null; then
+      echo "Trying installation through apt..."
+      sudo apt-get update
+      sudo apt-get install -y docker-compose
+    elif command -v yum &> /dev/null; then
+      echo "Trying installation through yum..."
+      sudo yum install -y docker-compose
+    fi
+  fi
+  
+  # Make executable
+  sudo chmod +x /usr/local/bin/docker-compose
+  
+  # Clean up
+  cd - > /dev/null
+  rm -rf "$TEMP_DIR"
+  
+  # Test installation
+  if docker-compose --version; then
+    echo "Docker Compose installation successful."
+  else
+    echo "WARNING: Docker Compose installation may have failed. Please install manually."
+  fi
+}
 
+# Check if docker-compose is installed and working
+if ! command -v docker-compose &> /dev/null || ! docker-compose --version &> /dev/null; then
+  echo "Docker Compose not found or not working properly. Installing..."
+  install_docker_compose
+else
+  echo "Docker Compose is already installed. Version: $(docker-compose --version)"
+fi
 echo "Setup complete. Please log out and log back in for group changes to take effect."
 
 ###########
@@ -457,13 +531,29 @@ else
 fi
 
 ###########
-# Start PostgreSQL container if not running
+# Start PostgreSQL container with persistence if not running
 ###########
 echo "Checking PostgreSQL container..."
 if ! sudo docker ps | grep -q "postgres.*5432"; then
-    echo "Starting PostgreSQL container..."
-    sudo docker run --name postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -p 5432:5432 -d postgres:latest
-    echo "PostgreSQL container started successfully."
+    echo "Starting PostgreSQL container with data persistence..."
+    
+    # Create data directory for PostgreSQL persistence
+    sudo mkdir -p /var/lib/postgresql/data
+    sudo chmod 777 /var/lib/postgresql/data
+    
+    sudo docker run --name postgres \
+      -e POSTGRES_PASSWORD=postgres \
+      -e POSTGRES_USER=postgres \
+      -e POSTGRES_DB=postgres \
+      -p 5432:5432 \
+      -v /var/lib/postgresql/data:/var/lib/postgresql/data \
+      -d postgres:latest
+      
+    echo "PostgreSQL container started with persistent storage."
+    
+    # Wait for PostgreSQL to be ready
+    echo "Waiting for PostgreSQL to initialize..."
+    sleep 15
 else
     echo "PostgreSQL container is already running."
 fi
@@ -517,25 +607,85 @@ rm /tmp/create_tables.sql
 
 echo "PostgreSQL tables created successfully."
 
+###########
+# Create permanent owner for tables
+###########
+echo "Creating permanent user for table ownership..."
+PGPASSWORD=postgres psql -h localhost -U postgres -d postgres << EOF
+-- Create permanent user for table ownership
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'permanent_owner') THEN
+    CREATE ROLE permanent_owner WITH LOGIN PASSWORD 'secure_permanent_password';
+  END IF;
+END
+\$\$;
+
+-- Grant necessary permissions
+GRANT ALL PRIVILEGES ON DATABASE postgres TO permanent_owner;
+GRANT ALL PRIVILEGES ON SCHEMA public TO permanent_owner;
+
+-- Change ownership of existing tables
+DO \$\$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE 'ALTER TABLE public.' || quote_ident(r.tablename) || ' OWNER TO permanent_owner';
+  END LOOP;
+END
+\$\$;
+
+-- Change ownership of sequences
+DO \$\$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'
+  LOOP
+    EXECUTE 'ALTER SEQUENCE public.' || quote_ident(r.sequence_name) || ' OWNER TO permanent_owner';
+  END LOOP;
+END
+\$\$;
+
+-- Set default privileges
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL PRIVILEGES ON TABLES TO permanent_owner;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL PRIVILEGES ON SEQUENCES TO permanent_owner;
+EOF
+
 # Check and create Vault user in PostgreSQL if it doesn't exist
 echo "Checking for Vault user in PostgreSQL..."
 if ! PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='vault'" | grep -q 1; then
     echo "Creating Vault user in PostgreSQL..."
     PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "CREATE USER vault WITH PASSWORD 'vault' CREATEDB CREATEROLE;"
     PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE postgres TO vault WITH GRANT OPTION;"
+    PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON SCHEMA public TO vault WITH GRANT OPTION;"
+    
+    # Only grant permissions on existing objects, don't give ownership
     PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO vault WITH GRANT OPTION;"
-    PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO vault WITH GRANT OPTION;"
     PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault WITH GRANT OPTION;"
+    
+    # Critical change: Don't set vault as the default owner of future objects
+    # Instead of using ALTER DEFAULT PRIVILEGES with GRANT ALL, use more specific permissions
+    PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault WITH GRANT OPTION;"
     PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO vault WITH GRANT OPTION;"
-    echo "Vault user created successfully with CREATEROLE privilege."
+    
+    echo "Vault user created successfully with limited privileges."
 else
     echo "Vault user already exists in PostgreSQL. Updating privileges..."
     PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "ALTER USER vault WITH CREATEROLE;"
     PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO vault WITH GRANT OPTION;"
-    PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO vault WITH GRANT OPTION;"
     PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vault WITH GRANT OPTION;"
+    
+    # Same change for existing user: Don't set vault as the default owner
+    PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vault WITH GRANT OPTION;"
     PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO vault WITH GRANT OPTION;"
-    echo "Vault user privileges updated."
+    
+    echo "Vault user privileges updated with limited ownership."
 fi
 
 # Enable database secrets engine if not already enabled
@@ -564,18 +714,24 @@ else
 fi
 
 # Check and create dynamic credentials role if it doesn't exist
-if ! /usr/local/bin/vault read database/roles/dynamic-creds &>/dev/null; then
+###########
+# Check and create dynamic credentials role for database access
+###########
+if ! vault read database/roles/dynamic-creds &>/dev/null; then
     echo "Creating dynamic credentials role..."
-    /usr/local/bin/vault write database/roles/dynamic-creds \
+    vault write database/roles/dynamic-creds \
         db_name=postgres \
         creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
           GRANT USAGE ON SCHEMA public TO \"{{name}}\";
-          GRANT SELECT, INSERT, UPDATE, DELETE ON public.transactions TO \"{{name}}\";
-          GRANT USAGE, SELECT ON SEQUENCE transactions_id_seq TO \"{{name}}\";" \
-        revocation_statements="DROP ROLE IF EXISTS \"{{name}}\";" \
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";" \
+        revocation_statements="REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
+          REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
+          REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
+          DROP ROLE IF EXISTS \"{{name}}\";" \
         default_ttl="8h" \
         max_ttl="72h"        
-    echo "Dynamic credentials role created with 30-minute TTL."
+    echo "Dynamic credentials role created with 8-hour TTL."
 else
     echo "Dynamic credentials role already exists."
 fi

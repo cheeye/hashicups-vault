@@ -188,25 +188,78 @@ else
     echo "PostgreSQL connection is already configured."
 fi
 
-# Check and create dynamic credentials role if it doesn't exist
+###########
+# Check and create dynamic credentials role for database access with safer configuration
+###########
 if ! vault read database/roles/dynamic-creds &>/dev/null; then
-    echo "Creating dynamic credentials role..."
+    echo "Creating dynamic credentials role with safer configuration..."
     vault write database/roles/dynamic-creds \
         db_name=postgres \
-        creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
-          GRANT USAGE ON SCHEMA public TO \"{{name}}\";
-          GRANT SELECT, INSERT, UPDATE, DELETE ON public.transactions TO \"{{name}}\";
-          GRANT USAGE, SELECT ON SEQUENCE transactions_id_seq TO \"{{name}}\";" \
-        revocation_statements="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = '{{name}}'; DROP ROLE IF EXISTS \"{{name}}\";" \
+        creation_statements="
+        -- Create the role with necessary privileges
+        CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}' BYPASSRLS;
+        
+        -- Grant schema usage
+        GRANT USAGE ON SCHEMA public TO \"{{name}}\";
+        
+        -- Grant direct table access
+        GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
+        
+        -- Grant direct sequence access
+        GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";
+        
+        -- Set default privileges for future objects
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO \"{{name}}\";
+        
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+        GRANT USAGE, SELECT ON SEQUENCES TO \"{{name}}\";" \
+        revocation_statements="
+        -- Revoke specific privileges first
+        REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
+        REVOKE USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
+        REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
+        
+        -- Drop only the dynamic role
+        DROP ROLE IF EXISTS \"{{name}}\";" \
         default_ttl="8h" \
         max_ttl="72h"        
-    echo "Dynamic credentials role created with 30-minute TTL."
+    echo "Dynamic credentials role created with 8-hour TTL and direct permissions."
 else
-    echo "Dynamic credentials role already exists."
+    echo "Dynamic credentials role already exists. Updating with safer configuration..."
+    vault write database/roles/dynamic-creds \
+        db_name=postgres \
+        creation_statements="
+        -- Create the role with necessary privileges
+        CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}' BYPASSRLS;
+        
+        -- Grant schema usage
+        GRANT USAGE ON SCHEMA public TO \"{{name}}\";
+        
+        -- Grant direct table access
+        GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";
+        
+        -- Grant direct sequence access
+        GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";
+        
+        -- Set default privileges for future objects
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO \"{{name}}\";
+        
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+        GRANT USAGE, SELECT ON SEQUENCES TO \"{{name}}\";" \
+        revocation_statements="
+        -- Revoke specific privileges first
+        REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM \"{{name}}\";
+        REVOKE USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public FROM \"{{name}}\";
+        REVOKE USAGE ON SCHEMA public FROM \"{{name}}\";
+        
+        -- Drop only the dynamic role
+        DROP ROLE IF EXISTS \"{{name}}\";" \
+        default_ttl="8h" \
+        max_ttl="72h"
+    echo "Dynamic credentials role updated with direct permissions."
 fi
-
-echo "Database credentials engine setup complete."
-
 
 ###########
 # Setup AppRole Authentication
