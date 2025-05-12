@@ -42,9 +42,9 @@ touch $(pwd)/hashicups-vault/docker-compose/vault-config/license.hclic
 
 ```
 #Example values
-POSTGRES_USER=<PG_USER>
-POSTGRES_PASSWORD=<PG_PASSWORD>
-POSTGRES_DB=<PG_DB
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=postgres
 HOST_PATH=.
 ```
 
