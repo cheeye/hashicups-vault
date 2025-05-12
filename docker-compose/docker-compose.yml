@@ -30,7 +30,9 @@ services:
     volumes:
       - ${HOST_PATH}:/scripts
     entrypoint: >
-      bash -c "until pg_isready -h postgres -p 5432; do sleep 1; done; sh /scripts/setup_postgres.sh"
+      bash -c "chmod +x /scripts/setup_postgres.sh && 
+              until pg_isready -h postgres -p 5432; do sleep 1; done; 
+              /scripts/setup_postgres.sh"
   vault-setup:
     image: panchalravi/vault-cli:latest
     container_name: vault-setup
@@ -42,7 +44,8 @@ services:
     volumes:
       - ${HOST_PATH}:/scripts:rw
     entrypoint: >
-      sh -c "/scripts/setup_vault.sh"
+      sh -c "chmod +x /scripts/setup_vault.sh && 
+             /scripts/setup_vault.sh"
   vault-agent:
     image: panchalravi/vault-cli:latest
     container_name: vault-agent
@@ -61,7 +64,9 @@ services:
       - ${HOST_PATH}:/scripts:ro
       - app-creds:/app/secrets:rw
     entrypoint: >
-      sh -c "/scripts/setup_vaultagent.sh"
+      sh -c "cp /scripts/setup_vaultagent.sh /tmp/setup_vaultagent.sh && 
+             chmod +x /tmp/setup_vaultagent.sh && 
+             /tmp/setup_vaultagent.sh"
   hashicups:
     image: shriramrajaraman/hashicups-python:linux1
     container_name: hashicups
