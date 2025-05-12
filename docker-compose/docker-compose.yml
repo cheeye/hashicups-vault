@@ -64,8 +64,9 @@ services:
       - ${HOST_PATH}:/scripts:ro
       - app-creds:/app/secrets:rw
     entrypoint: >
-      sh -c "chmod +x /scripts/setup_vaultagent.sh && 
-             /scripts/setup_vaultagent.sh"
+      sh -c "cp /scripts/setup_vaultagent.sh /tmp/setup_vaultagent.sh && 
+             chmod +x /tmp/setup_vaultagent.sh && 
+             /tmp/setup_vaultagent.sh"
   hashicups:
     image: shriramrajaraman/hashicups-python:linux1
     container_name: hashicups
