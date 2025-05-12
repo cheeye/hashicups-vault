@@ -61,12 +61,11 @@ services:
       vault-setup:
         condition: service_completed_successfully
     volumes:
-      - ${HOST_PATH}:/scripts:ro
+      - ${HOST_PATH}:/scripts:rw
       - app-creds:/app/secrets:rw
     entrypoint: >
-      sh -c "cp /scripts/setup_vaultagent.sh /tmp/setup_vaultagent.sh && 
-             chmod +x /tmp/setup_vaultagent.sh && 
-             /tmp/setup_vaultagent.sh"
+      sh -c "chmod +x /scripts/setup_vaultagent.sh && 
+             /scripts/setup_vaultagent.sh"
   hashicups:
     image: shriramrajaraman/hashicups-python:linux1
     container_name: hashicups
