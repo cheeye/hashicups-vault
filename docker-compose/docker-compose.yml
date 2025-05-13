@@ -47,6 +47,9 @@ services:
         condition: service_completed_successfully
     volumes:
       - ${HOST_PATH}:/scripts:rw
+    environment:
+      VAULT_ADMIN: ${VAULT_ADMIN}
+      VAULT_PASSWORD: ${VAULT_PASSWORD}
     entrypoint: >
       sh -c "chmod +x /scripts/setup_vault.sh && 
              /scripts/setup_vault.sh"

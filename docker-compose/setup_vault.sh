@@ -328,3 +328,43 @@ vault write auth/approle/role/vault-agent \
     token_policies="default,db-secrets,transit-encrypt" \
     token_ttl=720h \
     token_max_ttl=720h
+
+###########
+# Setup UserPass Authentication
+###########
+echo "Setting up UserPass authentication..."
+
+# Enable UserPass auth method if not already enabled
+if ! vault auth list | grep -q "userpass/"; then
+    echo "Enabling UserPass authentication..."
+    vault auth enable userpass
+    echo "UserPass authentication enabled."
+else
+    echo "UserPass authentication is already enabled."
+fi
+
+# Create admin policy
+echo "Checking for existing admin policy..."
+if ! vault policy read admin &>/dev/null; then
+    echo "Creating admin policy..."
+    cat << EOF | vault policy write admin -
+path "*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+EOF
+    echo "Admin policy created."
+else
+    echo "Admin policy already exists."
+fi
+
+
+
+# Create a new user with root policy
+echo "Creating user '${VAULT_ADMIN}' with root policy..."
+vault write auth/userpass/users/${VAULT_ADMIN} \
+    password="${VAULT_PASSWORD}" \
+    policies="admin" \
+    token_ttl=720h \
+    token_max_ttl=720h
+
+echo "UserPass authentication setup complete."
