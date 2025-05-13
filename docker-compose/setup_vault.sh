@@ -357,10 +357,8 @@ else
     echo "Admin policy already exists."
 fi
 
-
-
-# Create a new user with root policy
-echo "Creating user '${VAULT_ADMIN}' with root policy..."
+# Create a new user with admin policy
+echo "Creating user '${VAULT_ADMIN}' with admin policy..."
 vault write auth/userpass/users/${VAULT_ADMIN} \
     password="${VAULT_PASSWORD}" \
     policies="admin" \
