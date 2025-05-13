@@ -12,8 +12,17 @@ CREDS_DIR="/scripts/vault-creds"
 
 # Set Vault address
 export VAULT_ADDR="http://vault:8200"
-# echo "export VAULT_ADDR=http://vault:8200" >> ~/.bashrc
-# until vault status; do sleep 1; done;
+
+# Set default values for VAULT_ADMIN and VAULT_PASSWORD if they are empty
+if [ -z "${VAULT_ADMIN}" ]; then
+    export VAULT_ADMIN="admin"
+    echo "VAULT_ADMIN not set, using default value: ${VAULT_ADMIN}"
+fi
+
+if [ -z "${VAULT_PASSWORD}" ]; then
+    export VAULT_PASSWORD="hashicups"
+    echo "VAULT_PASSWORD not set, using default value: ${VAULT_PASSWORD}"
+fi
 
 # Check if Vault is already initialized
 if vault status | grep -q "Initialized.*true"; then
