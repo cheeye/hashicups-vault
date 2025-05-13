@@ -41,10 +41,13 @@ touch $(pwd)/hashicups-vault/docker-compose/vault-config/license.hclic
 ### 3. Create a .env file in the docker-compose directory in the cloned github repo. An example file has been placed where the .env file is expected. Replace the values with the actual values you would like to deploy Postgres with and the host path
 
 ```
+#Rename this file to .env before running "docker-compose up"
 #Example values
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=postgres
+POSTGRES_USER=<PG_USER>
+POSTGRES_PASSWORD=<PG_PASSWORD>
+POSTGRES_DB=<PG_DB>
+VAULT_ADMIN=<VAULT_ADMIN>
+VAULT_PASSWORD=<VAULT_PASSWORD>
 HOST_PATH=.
 ```
 
