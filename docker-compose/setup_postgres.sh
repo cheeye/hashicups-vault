@@ -32,7 +32,7 @@ EOF
 
 # Execute SQL file to create tables
 echo "Executing SQL file to create tables..."
-PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -f /tmp/create_tables.sql
+PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB -f /tmp/create_tables.sql
 
 # Remove the temporary SQL file
 rm /tmp/create_tables.sql
@@ -43,7 +43,7 @@ echo "PostgreSQL tables created successfully."
 # Create permanent owner for tables
 ###########
 echo "Creating permanent user for table ownership..."
-PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
+PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB << EOF
 -- Create permanent user for table ownership
 DO \$\$
 BEGIN
@@ -123,11 +123,11 @@ EOF
 echo "Checking for Vault user in PostgreSQL..."
 
 # Check if vault user exists
-VAULT_EXISTS=$(PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='vault'")
+VAULT_EXISTS=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB -tAc "SELECT 1 FROM pg_roles WHERE rolname='vault'")
 
 if [ -z "$VAULT_EXISTS" ]; then
     echo "Creating Vault user in PostgreSQL..."
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB << EOF
     -- Create vault user with necessary privileges
     CREATE USER vault WITH PASSWORD 'vault' CREATEROLE BYPASSRLS;
     
@@ -140,7 +140,7 @@ EOF
     echo "Vault user created successfully with limited privileges."
 else
     echo "Vault user already exists in PostgreSQL. Updating privileges..."
-    PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB << EOF
     -- Update vault user privileges
     ALTER USER vault WITH CREATEROLE BYPASSRLS;
     GRANT ALL PRIVILEGES ON SCHEMA public TO vault;
@@ -151,7 +151,7 @@ fi
 
 # Grant specific privileges on existing objects
 echo "Granting specific privileges on existing objects..."
-PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
+PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB << EOF
 -- Grant specific privileges on tables
 GRANT SELECT, INSERT, UPDATE, DELETE ON transactions TO vault;
 GRANT SELECT, INSERT, UPDATE, DELETE ON test TO vault;
@@ -170,7 +170,7 @@ EOF
 
 # Create trigger function and event trigger
 echo "Creating protection triggers..."
-PGPASSWORD=postgres psql -h postgres -U postgres -d postgres << EOF
+PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB << EOF
 -- Create trigger function to prevent drops
 CREATE OR REPLACE FUNCTION prevent_drop()
 RETURNS event_trigger AS \$\$

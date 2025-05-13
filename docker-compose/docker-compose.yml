@@ -29,6 +29,10 @@ services:
         condition: service_started
     volumes:
       - ${HOST_PATH}:/scripts
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     entrypoint: >
       bash -c "chmod +x /scripts/setup_postgres.sh && 
               until pg_isready -h postgres -p 5432; do sleep 1; done; 
@@ -67,7 +71,7 @@ services:
       sh -c "chmod +x /scripts/setup_vaultagent.sh && 
              /scripts/setup_vaultagent.sh"
   hashicups:
-    image: shriramrajaraman/hashicups-python:linux1
+    image: panchalravi/hashicups-python:latest
     container_name: hashicups
     ports:
       - "5000:5000"
