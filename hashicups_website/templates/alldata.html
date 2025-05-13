@@ -8,10 +8,31 @@
         th, td { padding: 8px 12px; border: 1px solid #ddd; }
         th { background-color: #f4f4f4; }
         tr:nth-child(even) { background-color: #f9f9f9; }
+        .header-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .home-link {
+            text-decoration: none;
+            color: #2C1810;
+            padding: 8px 16px;
+            border: 2px solid #2C1810;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+        }
+        .home-link:hover {
+            background-color: #2C1810;
+            color: white;
+        }
     </style>
 </head>
 <body>
-    <h2>All Transactions</h2>
+    <div class="header-container">
+        <h2>All Transactions</h2>
+        <a href="{{ url_for('index') }}" class="home-link">Home</a>
+    </div>
     <table>
         <thead>
             <tr>

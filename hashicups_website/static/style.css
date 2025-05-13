@@ -26,6 +26,7 @@ body {
 .header {
     text-align: center;
     padding: 20px 0;
+    position: relative;
 }
 
 .header-logo {
@@ -261,6 +262,24 @@ body {
 
 .security-info li {
     margin-bottom: 8px;
+}
+
+.all-orders-link {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary-color);
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 2px solid var(--primary-color);
+    transition: all 0.3s ease;
+}
+
+.all-orders-link:hover {
+    background-color: var(--primary-color);
+    color: white;
 }
 
 /* Responsive adjustments */
