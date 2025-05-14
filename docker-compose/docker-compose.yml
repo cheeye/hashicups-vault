@@ -2,8 +2,6 @@ services:
   vault:
     image: panchalravi/vault-server:latest
     container_name: vault
-    build:
-      context: .
     ports:
       - "8200:8200"
     volumes:
